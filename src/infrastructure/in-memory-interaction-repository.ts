@@ -29,4 +29,16 @@ export class InMemoryInteractionRepository implements InteractionRepository {
     const cle = this.cle(interaction.participantAId, interaction.participantBId);
     this.parCle.set(cle, interaction);
   }
+
+  async trouverDerniereDecideePar(utilisateurId: UtilisateurId): Promise<Swipe | null> {
+    return (
+      [...this.parCle.values()]
+        .filter((interaction) => interaction.getDateDecisionDe(utilisateurId) !== null)
+        .sort(
+          (a, b) =>
+            b.getDateDecisionDe(utilisateurId)!.getTime() -
+            a.getDateDecisionDe(utilisateurId)!.getTime(),
+        )[0] ?? null
+    );
+  }
 }
