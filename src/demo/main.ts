@@ -6,6 +6,9 @@ import { ServiceDecouverte } from '../application/service-decouverte.js';
 import { InMemoryInteractionRepository } from '../infrastructure/in-memory-interaction-repository.js';
 import { InMemoryCompteurSwipeRepository } from '../infrastructure/in-memory-compteur-swipe-repository.js';
 import { InMemoryAbonnementRepository } from '../infrastructure/in-memory-abonnement-repository.js';
+import { PolitiqueRewind } from '../domain/politique-rewind.js';
+import { EventBus } from '../infrastructure/event-bus.js';
+import type { MatchProduit } from '../domain/events/match-produit.js';
 
 /**
  * Point d'entrée de démonstration : câble le domaine, l'application et
@@ -19,7 +22,16 @@ async function main(): Promise<void> {
   const quota = new QuotaSwipe(3, 24 * 60 * 60 * 1000); // 3 swipes gratuits / 24h
   const exposition = new PolitiqueExposition(60 * 60 * 1000); // 1h entre expositions
 
-  const service = new ServiceDecouverte(interactions, compteurs, abonnements, quota, exposition);
+  const eventBus = new EventBus();
+  const politiqueRewind = new PolitiqueRewind(); 
+
+  eventBus.souscrire<MatchProduit>('MatchProduit', async (evt) => {
+    console.log(`\n🎉 [EVENT HANDLER] Match détecté !`);
+    console.log(`   - Participants : ${evt.participantAId} & ${evt.participantBId}`);
+    console.log(`   - Date : ${evt.dateSurvenue.toISOString()}\n`);
+  });
+
+  const service = new ServiceDecouverte(interactions, compteurs, abonnements, quota, exposition, politiqueRewind, eventBus);
 
   const alice = UtilisateurId('alice');
   const bob = UtilisateurId('bob');
@@ -36,3 +48,5 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
+
+

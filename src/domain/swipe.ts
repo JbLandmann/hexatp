@@ -1,7 +1,7 @@
 import type { InteractionId, UtilisateurId } from './ids.js';
 import { Decision, DecisionSwipe } from './decision.js';
 import type { DomainEvent } from './events/domain-event.js';
-import { MatchProduit } from './events/match-produit.js';4
+import { MatchProduit } from './events/match-produit.js';
 
 /** Statut d'une interaction entre deux participants. */
 export enum StatutInteraction {
@@ -17,6 +17,7 @@ export enum StatutInteraction {
 export class Swipe {
   private readonly decisions: DecisionSwipe[] = [];
   private statut: StatutInteraction = StatutInteraction.PENDING;
+  private readonly evenements: DomainEvent[] = []; // Stockage temporaire des événements métier
 
   constructor(
     public readonly id: InteractionId,
@@ -44,7 +45,8 @@ export class Swipe {
     this.decisions.push(decision);
     this.determinerResultat();
   }
-/**
+
+  /**
    * Retire la décision d'un émetteur spécifique et recalcule l'état de l'interaction.
    */
   annulerDecisionDe(emetteurId: UtilisateurId): void {
@@ -59,14 +61,18 @@ export class Swipe {
     // Recalcul du statut (revient à PENDING si plus de décisions)
     this.determinerResultat();
   }
+
   /**
    * Détermine le résultat de l'interaction.
    * Processus :
    *  - Un seul OUI et pas encore de réponse adverse => reste PENDING.
    *  - Dès qu'un NON est présent => NO_MATCH.
    *  - Deux OUI (un de chaque participant) => MATCHED.
+   * Déclenche également un Domain Event si l'on bascule vers MATCHED.
    */
   determinerResultat(): StatutInteraction {
+    const ancienStatut = this.statut;
+
     const aUnNon = this.decisions.some((d) => d.decision === Decision.NON);
     if (aUnNon) {
       this.statut = StatutInteraction.NO_MATCH;
@@ -77,7 +83,24 @@ export class Swipe {
       this.decisions.filter((d) => d.decision === Decision.OUI).map((d) => d.emetteurId),
     );
     this.statut = ouiDistincts.size === 2 ? StatutInteraction.MATCHED : StatutInteraction.PENDING;
+
+    // Si on vient de basculer vers MATCHED, on enregistre l'événement métier
+    if (ancienStatut !== StatutInteraction.MATCHED && this.statut === StatutInteraction.MATCHED) {
+      this.evenements.push(
+        new MatchProduit(this.id, this.participantAId, this.participantBId, new Date()),
+      );
+    }
+
     return this.statut;
+  }
+
+  /**
+   * Récupère les événements produits par l'agrégat et vide la liste (pattern collect & clear).
+   */
+  collecterEvenements(): DomainEvent[] {
+    const evts = [...this.evenements];
+    this.evenements.length = 0;
+    return evts;
   }
 
   getStatut(): StatutInteraction {

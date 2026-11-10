@@ -1,5 +1,3 @@
 node_modules/
 dist/
 *.log
-src/domain/event
-src/infrastructure/event.bus.ts

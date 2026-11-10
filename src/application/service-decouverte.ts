@@ -7,6 +7,7 @@ import type { PolitiqueRewind } from '../domain/politique-rewind.js';
 import type { InteractionRepository } from './ports/interaction-repository.js';
 import type { CompteurSwipeRepository } from './ports/compteur-swipe-repository.js';
 import type { AbonnementRepository } from './ports/abonnement-repository.js';
+import type { EventBus } from '../infrastructure/event-bus.js';
 
 /** Profil candidat renvoyé par la découverte. */
 export interface Profil {
@@ -27,33 +28,26 @@ export class ServiceDecouverte {
     private readonly quota: QuotaSwipe,
     private readonly exposition: PolitiqueExposition,
     private readonly politiqueRewind: PolitiqueRewind,
+    private readonly eventBus: EventBus, // 👈 Ajout du bus d'événements (Exercice 2)
   ) {}
 
-  /**
-   * Recherche des profils à proposer.
-   */
   rechercherProfils(candidats: Profil[], maintenant: Date = new Date()): Profil[] {
     const filtres = this.filtrerProfils(candidats, maintenant);
     return this.prioriserInteractionsEnAttente(filtres);
   }
 
-  /** Filtre : ne garde que les profils ré-exposables selon la policy. */
   filtrerProfils(candidats: Profil[], maintenant: Date = new Date()): Profil[] {
     return candidats.filter((p) =>
       this.exposition.verifierDelaiAvantNouvelleExposition(p.derniereExposition, maintenant),
     );
   }
 
-  /** Priorisation : les interactions en attente passent devant. */
   prioriserInteractionsEnAttente(profils: Profil[]): Profil[] {
     return [...profils].sort(
       (a, b) => Number(b.interactionEnAttente) - Number(a.interactionEnAttente),
     );
   }
 
-  /**
-   * Enregistre la décision d'un émetteur sur une cible.
-   */
   async enregistrerDecision(
     emetteurId: UtilisateurId,
     cibleId: UtilisateurId,
@@ -72,21 +66,18 @@ export class ServiceDecouverte {
 
     compteur.enregistrerDecision();
 
+    // 1. Persistance
     await this.interactions.sauvegarder(interaction);
     await this.compteurs.sauvegarder(compteur);
+
+    // 2. Publication des Domain Events après persistance réussie (Exercice 2)
+    for (const event of interaction.collecterEvenements()) {
+      await this.eventBus.publier(event);
+    }
 
     return interaction.getStatut();
   }
 
-  /**
-   * Annule la dernière décision prise par un utilisateur (fonctionnalité Rewind).
-   * Processus :
-   * 1. Charge l'abonnement via le port.
-   * 2. Vérifie le droit via la policy métier (PolitiqueRewind).
-   * 3. Récupère la dernière interaction concernée via le port.
-   * 4. Appelle la méthode métier sur l'agrégat Swipe.
-   * 5. Persiste l'état mis à jour via le port et renvoie le nouveau statut.
-   */
   async annulerDerniereDecision(
     utilisateurId: UtilisateurId,
     maintenant: Date = new Date(),
