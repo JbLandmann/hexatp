@@ -1,5 +1,7 @@
 import type { InteractionId, UtilisateurId } from './ids.js';
 import { Decision, DecisionSwipe } from './decision.js';
+import type { DomainEvent } from './events/domain-event.js';
+import { MatchProduit } from './events/match-produit.js';
 
 /** Statut d'une interaction entre deux participants. */
 export enum StatutInteraction {
@@ -15,6 +17,8 @@ export enum StatutInteraction {
 export class Swipe {
   private readonly decisions: DecisionSwipe[] = [];
   private statut: StatutInteraction = StatutInteraction.PENDING;
+  /** Événements métier survenus sur cet agrégat, en attente de publication. */
+  private readonly evenements: DomainEvent[] = [];
 
   constructor(
     public readonly id: InteractionId,
@@ -46,22 +50,49 @@ export class Swipe {
   /**
    * Détermine le résultat de l'interaction.
    * Processus :
-   *  - Un seul OUI et pas encore de réponse adverse => reste PENDING.
-   *  - Dès qu'un NON est présent => NO_MATCH.
-   *  - Deux OUI (un de chaque participant) => MATCHED.
+   *  1. Mémorise le statut AVANT recalcul (pour détecter une bascule).
+   *  2. Un NON présent => NO_MATCH ; deux OUI distincts => MATCHED ; sinon PENDING.
+   *  3. Si on BASCULE vers MATCHED (et qu'on n'y était pas déjà), on émet
+   *     l'événement MatchProduit. La condition sur l'ancien statut évite les
+   *     émissions en double si la méthode est rappelée.
    */
   determinerResultat(): StatutInteraction {
+    const statutAvant = this.statut;
+
     const aUnNon = this.decisions.some((d) => d.decision === Decision.NON);
     if (aUnNon) {
       this.statut = StatutInteraction.NO_MATCH;
-      return this.statut;
+    } else {
+      const ouiDistincts = new Set(
+        this.decisions.filter((d) => d.decision === Decision.OUI).map((d) => d.emetteurId),
+      );
+      this.statut = ouiDistincts.size === 2 ? StatutInteraction.MATCHED : StatutInteraction.PENDING;
     }
 
-    const ouiDistincts = new Set(
-      this.decisions.filter((d) => d.decision === Decision.OUI).map((d) => d.emetteurId),
-    );
-    this.statut = ouiDistincts.size === 2 ? StatutInteraction.MATCHED : StatutInteraction.PENDING;
+    const basculeVersMatch =
+      statutAvant !== StatutInteraction.MATCHED && this.statut === StatutInteraction.MATCHED;
+    if (basculeVersMatch) {
+      this.enregistrerEvenement(
+        new MatchProduit(this.id, this.participantAId, this.participantBId, new Date()),
+      );
+    }
+
     return this.statut;
+  }
+
+  /** Mémorise un événement métier survenu (émis par le domaine). */
+  private enregistrerEvenement(evenement: DomainEvent): void {
+    this.evenements.push(evenement);
+  }
+
+  /**
+   * Retourne les événements accumulés PUIS vide la liste (pattern collect & clear).
+   * Vider la liste évite de publier deux fois le même événement.
+   */
+  collecterEvenements(): DomainEvent[] {
+    const evenements = [...this.evenements];
+    this.evenements.length = 0;
+    return evenements;
   }
 
   getStatut(): StatutInteraction {

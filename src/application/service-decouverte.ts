@@ -6,6 +6,7 @@ import type { PolitiqueExposition } from '../domain/politique-exposition.js';
 import type { InteractionRepository } from './ports/interaction-repository.js';
 import type { CompteurSwipeRepository } from './ports/compteur-swipe-repository.js';
 import type { AbonnementRepository } from './ports/abonnement-repository.js';
+import type { EventBus } from '../infrastructure/event-bus.js';
 
 /** Profil candidat renvoyé par la découverte. */
 export interface Profil {
@@ -26,6 +27,7 @@ export class ServiceDecouverte {
     private readonly abonnements: AbonnementRepository,
     private readonly quota: QuotaSwipe,
     private readonly exposition: PolitiqueExposition,
+    private readonly bus: EventBus,
   ) {}
 
   /**
@@ -61,6 +63,7 @@ export class ServiceDecouverte {
    *  2. Récupère/crée l'interaction via le port.
    *  3. Enregistre la décision sur l'agrégat (qui recalcule le statut).
    *  4. Incrémente le compteur puis persiste le tout via les ports.
+   *  5. APRÈS persistance, publie les événements émis par l'agrégat sur le bus.
    */
   async enregistrerDecision(
     emetteurId: UtilisateurId,
@@ -82,6 +85,12 @@ export class ServiceDecouverte {
 
     await this.interactions.sauvegarder(interaction);
     await this.compteurs.sauvegarder(compteur);
+
+    // Publication APRÈS persistance : on ne notifie le reste du système que
+    // lorsque l'état est durablement enregistré (jamais avant).
+    for (const evenement of interaction.collecterEvenements()) {
+      await this.bus.publier(evenement);
+    }
 
     return interaction.getStatut();
   }
