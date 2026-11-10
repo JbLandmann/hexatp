@@ -5,6 +5,7 @@ import { StatutInteraction } from '../src/domain/swipe.js';
 import { Abonnement, StatutAbonnement } from '../src/domain/abonnement.js';
 import { QuotaSwipe } from '../src/domain/quota-swipe.js';
 import { PolitiqueExposition } from '../src/domain/politique-exposition.js';
+import { PolitiqueRewind } from '../src/domain/politique-rewind.js';
 import { ServiceDecouverte } from '../src/application/service-decouverte.js';
 import { InMemoryInteractionRepository } from '../src/infrastructure/in-memory-interaction-repository.js';
 import { InMemoryCompteurSwipeRepository } from '../src/infrastructure/in-memory-compteur-swipe-repository.js';
@@ -16,7 +17,15 @@ function creerService(limiteGratuite = 3) {
   const abonnements = new InMemoryAbonnementRepository();
   const quota = new QuotaSwipe(limiteGratuite, 24 * 60 * 60 * 1000);
   const exposition = new PolitiqueExposition(60 * 60 * 1000);
-  const service = new ServiceDecouverte(interactions, compteurs, abonnements, quota, exposition);
+  const rewind = new PolitiqueRewind();
+  const service = new ServiceDecouverte(
+    interactions,
+    compteurs,
+    abonnements,
+    quota,
+    exposition,
+    rewind,
+  );
   return { service, abonnements };
 }
 

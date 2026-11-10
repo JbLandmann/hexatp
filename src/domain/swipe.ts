@@ -64,6 +64,28 @@ export class Swipe {
     return this.statut;
   }
 
+  /**
+   * Annule la décision d'un émetteur sur cette interaction (fonctionnalité Rewind).
+   * Processus :
+   *  1. Localise la décision de l'émetteur (rien à faire si absente -> idempotent).
+   *  2. La retire du tableau interne (encapsulé, jamais exposé en écriture).
+   *  3. Recalcule le statut : sans deux OUI, l'agrégat revient à PENDING.
+   */
+  annulerDecisionDe(emetteurId: UtilisateurId): void {
+    const index = this.decisions.findIndex((d) => d.emetteurId === emetteurId);
+    if (index === -1) {
+      return;
+    }
+
+    this.decisions.splice(index, 1);
+    this.determinerResultat();
+  }
+
+  /** Indique si l'émetteur a déjà pris une décision sur cette interaction. */
+  aDecisionDe(emetteurId: UtilisateurId): boolean {
+    return this.decisions.some((d) => d.emetteurId === emetteurId);
+  }
+
   getStatut(): StatutInteraction {
     return this.statut;
   }

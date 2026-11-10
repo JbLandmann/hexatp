@@ -3,6 +3,7 @@ import { Decision, DecisionSwipe } from '../domain/decision.js';
 import type { StatutInteraction } from '../domain/swipe.js';
 import type { QuotaSwipe } from '../domain/quota-swipe.js';
 import type { PolitiqueExposition } from '../domain/politique-exposition.js';
+import type { PolitiqueRewind } from '../domain/politique-rewind.js';
 import type { InteractionRepository } from './ports/interaction-repository.js';
 import type { CompteurSwipeRepository } from './ports/compteur-swipe-repository.js';
 import type { AbonnementRepository } from './ports/abonnement-repository.js';
@@ -26,6 +27,7 @@ export class ServiceDecouverte {
     private readonly abonnements: AbonnementRepository,
     private readonly quota: QuotaSwipe,
     private readonly exposition: PolitiqueExposition,
+    private readonly rewind: PolitiqueRewind,
   ) {}
 
   /**
@@ -82,6 +84,34 @@ export class ServiceDecouverte {
 
     await this.interactions.sauvegarder(interaction);
     await this.compteurs.sauvegarder(compteur);
+
+    return interaction.getStatut();
+  }
+
+  /**
+   * Annule la dernière décision de l'utilisateur (fonctionnalité Rewind).
+   * Processus :
+   *  1. Charge l'abonnement via le port, puis vérifie le droit (policy pure).
+   *  2. Récupère la dernière interaction décidée via le port.
+   *  3. Délègue l'annulation à l'agrégat (qui recalcule son statut).
+   *  4. Persiste l'interaction mise à jour et renvoie le nouveau statut.
+   */
+  async annulerDerniereDecision(
+    utilisateurId: UtilisateurId,
+    maintenant: Date = new Date(),
+  ): Promise<StatutInteraction> {
+    const abonnement = await this.abonnements.obtenirActif(utilisateurId);
+    if (!this.rewind.peutAnnuler(abonnement, maintenant)) {
+      throw new Error('Rewind réservé aux abonnés premium');
+    }
+
+    const interaction = await this.interactions.trouverDerniereDecisionDe(utilisateurId);
+    if (!interaction) {
+      throw new Error('Aucune décision à annuler');
+    }
+
+    interaction.annulerDecisionDe(utilisateurId);
+    await this.interactions.sauvegarder(interaction);
 
     return interaction.getStatut();
   }
