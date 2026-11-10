@@ -67,4 +67,17 @@ export class Swipe {
   getStatut(): StatutInteraction {
     return this.statut;
   }
+
+  /** On trouve la dernière décision de l'utilisateur en prenant celle avec la date la plus récente
+   * On la retire de la BDD mais on peut pas utiliser les repository donc je sais pas comment on fait
+   * On retire la décision de l'utilisateur dans l'interaction à laquelle elle était associée grâce à son id
+   */
+  annulerDecisionDe(emetteurId: UtilisateurId): void{
+    this.decisions.forEach((decision, index) => {
+      if(decision.emetteurId === emetteurId){
+        this.decisions.splice(index, 1);
+        this.determinerResultat();
+      }      
+    });
+  }
 }

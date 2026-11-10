@@ -6,6 +6,7 @@ import type { PolitiqueExposition } from '../domain/politique-exposition.js';
 import type { InteractionRepository } from './ports/interaction-repository.js';
 import type { CompteurSwipeRepository } from './ports/compteur-swipe-repository.js';
 import type { AbonnementRepository } from './ports/abonnement-repository.js';
+import type { PolitiqueRewind } from '../domain/politique-rewind.js';
 
 /** Profil candidat renvoyé par la découverte. */
 export interface Profil {
@@ -26,6 +27,7 @@ export class ServiceDecouverte {
     private readonly abonnements: AbonnementRepository,
     private readonly quota: QuotaSwipe,
     private readonly exposition: PolitiqueExposition,
+    private readonly rewind: PolitiqueRewind,
   ) {}
 
   /**
@@ -84,5 +86,14 @@ export class ServiceDecouverte {
     await this.compteurs.sauvegarder(compteur);
 
     return interaction.getStatut();
+  }
+
+  async annulerDerniereDecision(utilisateurId: UtilisateurId): Promise<StatutInteraction>{
+    const abonnement = await this.abonnements.obtenirActif(utilisateurId);
+    const date = new Date;
+    const interaction = this.interactions.retrouverDerniereInteraction(utilisateurId);
+    if(this.rewind.peutAnnuler(abonnement, date)){
+      
+    }
   }
 }

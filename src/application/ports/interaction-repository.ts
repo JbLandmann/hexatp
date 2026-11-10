@@ -1,5 +1,5 @@
 import type { Swipe } from '../../domain/swipe.js';
-import type { UtilisateurId } from '../../domain/ids.js';
+import type { InteractionId, UtilisateurId } from '../../domain/ids.js';
 
 /**
  * Port (côté application) : accès aux interactions.
@@ -10,4 +10,6 @@ export interface InteractionRepository {
   trouverOuCreer(participantAId: UtilisateurId, participantBId: UtilisateurId): Promise<Swipe>;
   /** Persiste l'état de l'interaction. */
   sauvegarder(interaction: Swipe): Promise<void>;
+  /** Retrouve la dernière interaction décidée par un utilisateur */
+  retrouverDerniereInteraction(utilisateur: UtilisateurId): Promise<InteractionId | null>;
 }

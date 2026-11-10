@@ -29,4 +29,8 @@ export class InMemoryInteractionRepository implements InteractionRepository {
     const cle = this.cle(interaction.participantAId, interaction.participantBId);
     this.parCle.set(cle, interaction);
   }
+
+  async retrouverDerniereInteraction(utilisateur: UtilisateurId): Promise<InteractionId | null>{
+    return null;
+  }
 }
