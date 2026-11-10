@@ -1,7 +1,13 @@
-import { randomUUID } from 'node:crypto';
-import { Swipe } from '../domain/swipe.js';
-import { InteractionId, type UtilisateurId } from '../domain/ids.js';
 import type { InteractionRepository } from '../application/ports/interaction-repository.js';
+import { InteractionId, type UtilisateurId } from '../domain/ids.js';
+import { Swipe } from '../domain/swipe.js';
+
+function randomUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (caractere) => {
+    const aleatoire = Math.floor(Math.random() * 16);
+    return (caractere === 'x' ? aleatoire : (aleatoire & 0x3) | 0x8).toString(16);
+  });
+}
 
 /**
  * Adaptateur (infrastructure) : stockage en mémoire des interactions.
@@ -23,6 +29,22 @@ export class InMemoryInteractionRepository implements InteractionRepository {
       this.parCle.set(cle, interaction);
     }
     return interaction;
+  }
+
+  async trouverDerniereDecisionDe(utilisateurId: UtilisateurId): Promise<Swipe | null> {
+    let derniereInteraction: Swipe | null = null;
+    let dateDerniereDecision: Date | null = null;
+
+    // Processus : compare la date des décisions exposées par chaque agrégat.
+    for (const interaction of this.parCle.values()) {
+      const decision = interaction.derniereDecisionDe(utilisateurId);
+      if (decision && (!dateDerniereDecision || decision.dateDecision > dateDerniereDecision)) {
+        derniereInteraction = interaction;
+        dateDerniereDecision = decision.dateDecision;
+      }
+    }
+
+    return derniereInteraction;
   }
 
   async sauvegarder(interaction: Swipe): Promise<void> {
