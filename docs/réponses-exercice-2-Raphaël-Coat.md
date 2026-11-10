@@ -11,6 +11,8 @@
 
 ## 🛠️ Partie B — Appliquer & Créer : implémenter à partir du diagramme (30 min)
 
+voir Pull request
+
 **B.1 — L'événement `MatchProduit`** (`src/domain/events/match-produit.ts`)
 Un objet immuable implémentant `DomainEvent`, portant de quoi notifier les deux participants.
 

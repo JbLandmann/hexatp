@@ -114,7 +114,9 @@ Service -> Swipe : annulerDecisionDe(emetteurId)
 
 ![alt text](Diagramme-Raphaël-Coat.png)
 
+## 🛠️ Partie C — Créer : implémenter la tranche verticale (25 min)
 
+voir Pull request
 
 C1 :
 
