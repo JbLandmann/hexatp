@@ -1,5 +1,7 @@
 import type { InteractionId, UtilisateurId } from './ids.js';
 import { Decision, DecisionSwipe } from './decision.js';
+import type { DomainEvent } from './events/domain-event.js';
+import { MatchProduit } from './events/match-produit.js';4
 
 /** Statut d'une interaction entre deux participants. */
 export enum StatutInteraction {
@@ -42,7 +44,21 @@ export class Swipe {
     this.decisions.push(decision);
     this.determinerResultat();
   }
+/**
+   * Retire la décision d'un émetteur spécifique et recalcule l'état de l'interaction.
+   */
+  annulerDecisionDe(emetteurId: UtilisateurId): void {
+    const index = this.decisions.findIndex((d) => d.emetteurId === emetteurId);
+    if (index === -1) {
+      return; 
+    }
 
+    // Modification de l'état interne de l'agrégat
+    this.decisions.splice(index, 1);
+    
+    // Recalcul du statut (revient à PENDING si plus de décisions)
+    this.determinerResultat();
+  }
   /**
    * Détermine le résultat de l'interaction.
    * Processus :
