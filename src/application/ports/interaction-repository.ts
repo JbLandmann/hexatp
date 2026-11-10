@@ -10,4 +10,5 @@ export interface InteractionRepository {
   trouverOuCreer(participantAId: UtilisateurId, participantBId: UtilisateurId): Promise<Swipe>;
   /** Persiste l'état de l'interaction. */
   sauvegarder(interaction: Swipe): Promise<void>;
+  trouverDerniereDecisionDe(utilisateurId: UtilisateurId): Promise<Swipe | null>;
 }

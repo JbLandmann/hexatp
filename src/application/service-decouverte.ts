@@ -1,11 +1,13 @@
 import type { UtilisateurId } from '../domain/ids.js';
 import { Decision, DecisionSwipe } from '../domain/decision.js';
-import type { StatutInteraction } from '../domain/swipe.js';
+import type { StatutInteraction, Swipe } from '../domain/swipe.js';
 import type { QuotaSwipe } from '../domain/quota-swipe.js';
 import type { PolitiqueExposition } from '../domain/politique-exposition.js';
+import type { PolitiqueRewind } from '../domain/politique-rewind.js';
 import type { InteractionRepository } from './ports/interaction-repository.js';
 import type { CompteurSwipeRepository } from './ports/compteur-swipe-repository.js';
 import type { AbonnementRepository } from './ports/abonnement-repository.js';
+import type { PublicateurEvenements } from './ports/publicateur-evenements.js';
 
 /** Profil candidat renvoyé par la découverte. */
 export interface Profil {
@@ -26,6 +28,8 @@ export class ServiceDecouverte {
     private readonly abonnements: AbonnementRepository,
     private readonly quota: QuotaSwipe,
     private readonly exposition: PolitiqueExposition,
+    private readonly rewind: PolitiqueRewind,
+    private readonly bus: PublicateurEvenements,
   ) {}
 
   /**
@@ -83,6 +87,35 @@ export class ServiceDecouverte {
     await this.interactions.sauvegarder(interaction);
     await this.compteurs.sauvegarder(compteur);
 
+    await this.publierEvenements(interaction);
+
     return interaction.getStatut();
+  }
+
+  async annulerDerniereDecision(
+    utilisateurId: UtilisateurId,
+    maintenant: Date = new Date(),
+  ): Promise<StatutInteraction> {
+    const abonnement = await this.abonnements.obtenirActif(utilisateurId);
+    if (!this.rewind.peutAnnuler(abonnement, maintenant)) {
+      throw new Error('Rewind réservé aux abonnés premium');
+    }
+
+    const interaction = await this.interactions.trouverDerniereDecisionDe(utilisateurId);
+    if (!interaction) {
+      throw new Error('Aucune décision à annuler');
+    }
+
+    interaction.annulerDecisionDe(utilisateurId);
+    await this.interactions.sauvegarder(interaction);
+    await this.publierEvenements(interaction);
+
+    return interaction.getStatut();
+  }
+
+  private async publierEvenements(interaction: Swipe): Promise<void> {
+    for (const evenement of interaction.collecterEvenements()) {
+      await this.bus.publier(evenement);
+    }
   }
 }

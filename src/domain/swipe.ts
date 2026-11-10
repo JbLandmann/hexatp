@@ -1,5 +1,7 @@
 import type { InteractionId, UtilisateurId } from './ids.js';
 import { Decision, DecisionSwipe } from './decision.js';
+import type { DomainEvent } from './events/domain-event.js';
+import { MatchProduit } from './events/match-produit.js';
 
 /** Statut d'une interaction entre deux participants. */
 export enum StatutInteraction {
@@ -15,6 +17,7 @@ export enum StatutInteraction {
 export class Swipe {
   private readonly decisions: DecisionSwipe[] = [];
   private statut: StatutInteraction = StatutInteraction.PENDING;
+  private readonly evenements: DomainEvent[] = [];
 
   constructor(
     public readonly id: InteractionId,
@@ -51,20 +54,56 @@ export class Swipe {
    *  - Deux OUI (un de chaque participant) => MATCHED.
    */
   determinerResultat(): StatutInteraction {
-    const aUnNon = this.decisions.some((d) => d.decision === Decision.NON);
-    if (aUnNon) {
-      this.statut = StatutInteraction.NO_MATCH;
-      return this.statut;
+    const statutAvant = this.statut;
+    this.statut = this.calculerStatut();
+
+    if (statutAvant !== StatutInteraction.MATCHED && this.statut === StatutInteraction.MATCHED) {
+      this.enregistrerEvenement(
+        new MatchProduit(this.id, this.participantAId, this.participantBId, this.dateDerniereDecision()),
+      );
+    }
+    return this.statut;
+  }
+
+  annulerDecisionDe(emetteurId: UtilisateurId): void {
+    const index = this.decisions.findIndex((d) => d.emetteurId === emetteurId);
+    if (index === -1) {
+      return;
+    }
+    this.decisions.splice(index, 1);
+    this.determinerResultat();
+  }
+
+  dateDecisionDe(emetteurId: UtilisateurId): Date | null {
+    return this.decisions.find((d) => d.emetteurId === emetteurId)?.dateDecision ?? null;
+  }
+
+  collecterEvenements(): DomainEvent[] {
+    const evenements = [...this.evenements];
+    this.evenements.length = 0;
+    return evenements;
+  }
+
+  getStatut(): StatutInteraction {
+    return this.statut;
+  }
+
+  private calculerStatut(): StatutInteraction {
+    if (this.decisions.some((d) => d.decision === Decision.NON)) {
+      return StatutInteraction.NO_MATCH;
     }
 
     const ouiDistincts = new Set(
       this.decisions.filter((d) => d.decision === Decision.OUI).map((d) => d.emetteurId),
     );
-    this.statut = ouiDistincts.size === 2 ? StatutInteraction.MATCHED : StatutInteraction.PENDING;
-    return this.statut;
+    return ouiDistincts.size === 2 ? StatutInteraction.MATCHED : StatutInteraction.PENDING;
   }
 
-  getStatut(): StatutInteraction {
-    return this.statut;
+  private enregistrerEvenement(evenement: DomainEvent): void {
+    this.evenements.push(evenement);
+  }
+
+  private dateDerniereDecision(): Date {
+    return this.decisions[this.decisions.length - 1].dateDecision;
   }
 }
