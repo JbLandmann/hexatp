@@ -20,39 +20,9 @@
 
 ## Partie B′
 
-```plantuml
-@startuml
-actor Utilisateur
-participant ServiceDecouverte as Service
-participant AbonnementRepository as AboRepo
-participant PolitiqueRewind as Politique
-participant InteractionRepository as InterRepo
-participant Swipe
+![Diagramme de séquence du Rewind](diagrammes/sequence-rewind.png)
 
-Utilisateur -> Service : annulerDerniereDecision(utilisateurId)
-activate Service
-
-Service -> AboRepo : obtenirActif(utilisateurId)
-AboRepo --> Service : abonnement
-
-Service -> Politique : peutAnnuler(abonnement, maintenant)
-Politique --> Service : true
-
-Service -> InterRepo : trouverDerniereDecisionDe(utilisateurId)
-InterRepo --> Service : swipe
-
-Service -> Swipe : annulerDecisionDe(utilisateurId)
-Swipe -> Swipe : determinerResultat() => PENDING
-
-Service -> InterRepo : sauvegarder(swipe)
-
-Service -> Swipe : getStatut()
-Swipe --> Service : PENDING
-
-Service --> Utilisateur : StatutInteraction.PENDING
-deactivate Service
-@enduml
-```
+Source draw.io : [`diagrammes/sequence-rewind.drawio`](diagrammes/sequence-rewind.drawio)
 
 C'est le service qui charge l'abonnement et le donne à la policy. `Swipe` ne parle à aucun repository.
 
