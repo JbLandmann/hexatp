@@ -6,6 +6,7 @@ import type { PolitiqueExposition } from '../domain/politique-exposition.js';
 import type { InteractionRepository } from './ports/interaction-repository.js';
 import type { CompteurSwipeRepository } from './ports/compteur-swipe-repository.js';
 import type { AbonnementRepository } from './ports/abonnement-repository.js';
+import type { PolitiqueRewind } from '../domain/politique-rewind.js';
 
 /** Profil candidat renvoyé par la découverte. */
 export interface Profil {
@@ -26,6 +27,7 @@ export class ServiceDecouverte {
     private readonly abonnements: AbonnementRepository,
     private readonly quota: QuotaSwipe,
     private readonly exposition: PolitiqueExposition,
+    private readonly rewind: PolitiqueRewind,
   ) {}
 
   /**
@@ -82,6 +84,34 @@ export class ServiceDecouverte {
 
     await this.interactions.sauvegarder(interaction);
     await this.compteurs.sauvegarder(compteur);
+
+    return interaction.getStatut();
+  }
+
+  /**
+   * Annule la dernière décision de l'utilisateur.
+   * Processus :
+   *  1. Charge son abonnement et vérifie le droit via la policy Rewind.
+   *  2. Récupère sa dernière interaction décidée via le port.
+   *  3. Annule sa décision sur l'agrégat, qui recalcule son statut.
+   *  4. Persiste l'interaction mise à jour puis retourne son statut.
+   */
+  async annulerDerniereDecision(
+    utilisateurId: UtilisateurId,
+    maintenant: Date = new Date(),
+  ): Promise<StatutInteraction> {
+    const abonnement = await this.abonnements.obtenirActif(utilisateurId);
+    if (!this.rewind.peutAnnuler(abonnement, maintenant)) {
+      throw new Error('Abonnement premium requis pour annuler une décision');
+    }
+
+    const interaction = await this.interactions.trouverDerniereDecideePar(utilisateurId);
+    if (!interaction) {
+      throw new Error('Aucune décision à annuler');
+    }
+
+    interaction.annulerDecisionDe(utilisateurId);
+    await this.interactions.sauvegarder(interaction);
 
     return interaction.getStatut();
   }

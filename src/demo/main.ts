@@ -2,6 +2,7 @@ import { UtilisateurId } from '../domain/ids.js';
 import { Decision } from '../domain/decision.js';
 import { QuotaSwipe } from '../domain/quota-swipe.js';
 import { PolitiqueExposition } from '../domain/politique-exposition.js';
+import { PolitiqueRewind } from '../domain/politique-rewind.js';
 import { ServiceDecouverte } from '../application/service-decouverte.js';
 import { InMemoryInteractionRepository } from '../infrastructure/in-memory-interaction-repository.js';
 import { InMemoryCompteurSwipeRepository } from '../infrastructure/in-memory-compteur-swipe-repository.js';
@@ -19,7 +20,8 @@ async function main(): Promise<void> {
   const quota = new QuotaSwipe(3, 24 * 60 * 60 * 1000); // 3 swipes gratuits / 24h
   const exposition = new PolitiqueExposition(60 * 60 * 1000); // 1h entre expositions
 
-  const service = new ServiceDecouverte(interactions, compteurs, abonnements, quota, exposition);
+  const rewind = new PolitiqueRewind();
+  const service = new ServiceDecouverte(interactions, compteurs, abonnements, quota, exposition, rewind);
 
   const alice = UtilisateurId('alice');
   const bob = UtilisateurId('bob');
